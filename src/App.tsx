@@ -1,4 +1,11 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import type { Dims, TextureId } from "./types";
+import {
+  mergeUrlState,
+  parseUrlParams,
+  stateToSearchParams,
+  type AppUrlState,
+} from "./urlParams";
 
 /* ------------------------------------------------------------------ *
  *  Blob Gradient Generator
@@ -9,8 +16,6 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 /* ---------- types ---------- */
 
 type RGB = { r: number; g: number; b: number };
-type TextureId = "pixels" | "dots" | "ascii" | "none";
-type Dims = { w: number; h: number };
 
 interface Params {
   colors: string[];
@@ -270,7 +275,47 @@ const TEXTURES: { id: TextureId; label: string }[] = [
   { id: "none", label: "Aucun" },
 ];
 
-const DEFAULT_COLORS = ["#3B6FE0", "#3FD98A", "#F4B6E6", "#FFFFFF"];
+const randomSeed = (): number => (Math.random() * 1e9) | 0;
+const randomAng = (): number => Math.random() * Math.PI * 2;
+
+function readInitialState(): AppUrlState {
+  return mergeUrlState(
+    parseUrlParams(new URLSearchParams(window.location.search)),
+    randomSeed,
+    randomAng
+  );
+}
+
+function applyUrlState(
+  partial: Partial<AppUrlState>,
+  setters: {
+    setColors: (v: string[]) => void;
+    setTexture: (v: TextureId) => void;
+    setGrain: (v: number) => void;
+    setContrast: (v: number) => void;
+    setFeatures: (v: number) => void;
+    setWarp: (v: number) => void;
+    setDims: (v: Dims) => void;
+    setAsciiBg: (v: string) => void;
+    setExportScale: (v: number) => void;
+    setSeed: (v: number) => void;
+    setAng: (v: number) => void;
+    setAmp: (v: number) => void;
+  }
+): void {
+  if (partial.colors) setters.setColors(partial.colors);
+  if (partial.texture) setters.setTexture(partial.texture);
+  if (partial.grain != null) setters.setGrain(partial.grain);
+  if (partial.contrast != null) setters.setContrast(partial.contrast);
+  if (partial.features != null) setters.setFeatures(partial.features);
+  if (partial.warp != null) setters.setWarp(partial.warp);
+  if (partial.dims) setters.setDims(partial.dims);
+  if (partial.asciiBg) setters.setAsciiBg(partial.asciiBg);
+  if (partial.exportScale != null) setters.setExportScale(partial.exportScale);
+  if (partial.seed != null) setters.setSeed(partial.seed);
+  if (partial.ang != null) setters.setAng(partial.ang);
+  if (partial.amp != null) setters.setAmp(partial.amp);
+}
 
 function Field({ label, value, children }: FieldProps) {
   return (
@@ -287,18 +332,19 @@ function Field({ label, value, children }: FieldProps) {
 /* ================================================================== */
 
 export default function App() {
-  const [colors, setColors] = useState<string[]>(DEFAULT_COLORS);
-  const [texture, setTexture] = useState<TextureId>("pixels");
-  const [grain, setGrain] = useState(7);
-  const [contrast, setContrast] = useState(0.5);
-  const [features, setFeatures] = useState(3.4); // échelle des formes
-  const [warp, setWarp] = useState(1.1); // fluidité / distorsion
-  const [dims, setDims] = useState<Dims>({ w: 1200, h: 800 });
-  const [asciiBg, setAsciiBg] = useState("#0c0d12");
-  const [exportScale, setExportScale] = useState(3);
-  const [seed, setSeed] = useState(() => (Math.random() * 1e9) | 0);
-  const [ang, setAng] = useState(() => Math.random() * Math.PI * 2);
-  const [amp, setAmp] = useState(0.95);
+  const [initial] = useState(readInitialState);
+  const [colors, setColors] = useState<string[]>(initial.colors);
+  const [texture, setTexture] = useState<TextureId>(initial.texture);
+  const [grain, setGrain] = useState(initial.grain);
+  const [contrast, setContrast] = useState(initial.contrast);
+  const [features, setFeatures] = useState(initial.features);
+  const [warp, setWarp] = useState(initial.warp);
+  const [dims, setDims] = useState<Dims>(initial.dims);
+  const [asciiBg, setAsciiBg] = useState(initial.asciiBg);
+  const [exportScale, setExportScale] = useState(initial.exportScale);
+  const [seed, setSeed] = useState(initial.seed);
+  const [ang, setAng] = useState(initial.ang);
+  const [amp, setAmp] = useState(initial.amp);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -323,6 +369,61 @@ export default function App() {
     },
     [colors, seed, texture, grain, contrast, features, warp, amp, ang, asciiBg, dims]
   );
+
+  useEffect(() => {
+    const qs = stateToSearchParams({
+      colors,
+      texture,
+      grain,
+      contrast,
+      features,
+      warp,
+      dims,
+      asciiBg,
+      exportScale,
+      seed,
+      ang,
+      amp,
+    }).toString();
+    const next = qs ? `?${qs}` : "";
+    if (window.location.search !== next) {
+      window.history.replaceState(null, "", `${window.location.pathname}${next}`);
+    }
+  }, [
+    colors,
+    texture,
+    grain,
+    contrast,
+    features,
+    warp,
+    dims,
+    asciiBg,
+    exportScale,
+    seed,
+    ang,
+    amp,
+  ]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      applyUrlState(parseUrlParams(new URLSearchParams(window.location.search)), {
+        setColors,
+        setTexture,
+        setGrain,
+        setContrast,
+        setFeatures,
+        setWarp,
+        setDims,
+        setAsciiBg,
+        setExportScale,
+        setSeed,
+        setAng,
+        setAmp,
+      });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // rendu écran
   useEffect(() => {
