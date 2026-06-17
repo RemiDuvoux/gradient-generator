@@ -1,0 +1,163 @@
+# Blob Gradient Generator
+
+> Organic blob gradient background generator with pixel / halftone / ASCII textures. Canvas 2D, runs entirely in the browser, exports PNG.
+
+Live app: https://remiduvoux.github.io/gradient-generator/
+LLM docs: https://remiduvoux.github.io/gradient-generator/llms.txt
+
+## How to use (for agents)
+
+All settings are controlled via **URL query parameters**. Open the app with a query string to render a specific gradient. The URL is kept in sync as the user edits controls — read `window.location.search` or the address bar to get the current state.
+
+Invalid or out-of-range values are clamped or ignored (falls back to default for that field). Omitted parameters use defaults; `seed`, `ang`, and `amp` randomize when omitted, then the URL is updated with the resolved values.
+
+## URL format
+
+```
+https://remiduvoux.github.io/gradient-generator/?<param>=<value>&<param>=<value>...
+```
+
+Hex colors in URLs omit the `#` prefix.
+
+## Parameters
+
+### colors
+- **Type:** comma-separated hex colors (2–5 colors)
+- **Default:** `3B6FE0,3FD98A,F4B6E6,FFFFFF`
+- **Example:** `colors=FF006E,8338EC,3A86FF`
+- **Notes:** 3- or 6-digit hex accepted; shorthand like `F0A` is expanded to `#FF00AA`.
+
+### texture
+- **Type:** enum
+- **Default:** `pixels`
+- **Possible values:**
+  - `pixels` — ordered dither (Bayer matrix), blocky pixel look
+  - `dots` — halftone dots on a flat background
+  - `ascii` — characters (`= + x X S # @`) on a solid background
+  - `none` — smooth gradient, no texture overlay
+- **Example:** `texture=dots`
+
+### grain
+- **Type:** integer (px)
+- **Range:** 2–24
+- **Default:** `7`
+- **Example:** `grain=5`
+- **Notes:** Cell size for textured modes. Ignored visually when `texture=none` (uses fine sampling instead). Hidden in UI when texture is `none`.
+
+### contrast
+- **Type:** float
+- **Range:** 0–1
+- **Default:** `0.5`
+- **Example:** `contrast=0.7`
+- **Notes:** Higher = sharper transitions between color bands in textured modes.
+
+### features
+- **Type:** float
+- **Range:** 1.5–7
+- **Default:** `3.4`
+- **Example:** `features=4.2`
+- **Notes:** Scale of blob shapes (noise frequency). Lower = larger blobs; higher = more detail.
+
+### warp
+- **Type:** float
+- **Range:** 0–2.2
+- **Default:** `1.1`
+- **Example:** `warp=1.5`
+- **Notes:** Domain-warp fluidity / distortion strength.
+
+### w
+- **Type:** integer (px)
+- **Range:** 200–4000
+- **Default:** `1200`
+- **Example:** `w=1280`
+- **Notes:** Canvas / export base width.
+
+### h
+- **Type:** integer (px)
+- **Range:** 200–4000
+- **Default:** `800`
+- **Example:** `h=720`
+- **Notes:** Canvas / export base height.
+
+### asciiBg
+- **Type:** hex color
+- **Default:** `0c0d12`
+- **Example:** `asciiBg=000000`
+- **Notes:** Background color when `texture=ascii`. Has no visible effect on other textures.
+
+### exportScale
+- **Type:** integer
+- **Range:** 1–3
+- **Default:** `3`
+- **Possible values:** `1`, `2`, `3`
+- **Example:** `exportScale=2`
+- **Notes:** Multiplier for PNG export resolution. Export size = `w × exportScale` by `h × exportScale`. Export is triggered manually via the "Export PNG" button in the UI (not via URL).
+
+### seed
+- **Type:** integer
+- **Default:** random on each load if omitted
+- **Example:** `seed=482910374`
+- **Notes:** Drives noise field and color-stop positions. Same seed + same other params = reproducible output.
+
+### ang
+- **Type:** float (radians)
+- **Range:** 0–6.283… (0–2π)
+- **Default:** random on each load if omitted
+- **Example:** `ang=1.57` (≈ 90°)
+- **Notes:** Direction of the base gradient sweep.
+
+### amp
+- **Type:** float
+- **Range:** 0–2
+- **Default:** `0.95` (randomized to 0.8–1.2 when user clicks Regenerate)
+- **Example:** `amp=0.9`
+- **Notes:** Amplitude of noise displacement on the gradient field.
+
+## Common dimension presets
+
+| Ratio | w   | h   |
+|-------|-----|-----|
+| 16:9  | 1280| 720 |
+| 3:2   | 1200| 800 |
+| 4:3   | 1200| 900 |
+| 1:1   | 1000| 1000|
+| 9:16  | 720 | 1280|
+
+## Example URLs
+
+**Default-like, fixed seed:**
+
+```
+https://remiduvoux.github.io/gradient-generator/?colors=3B6FE0,3FD98A,F4B6E6,FFFFFF&texture=pixels&grain=7&contrast=0.5&features=3.4&warp=1.1&w=1200&h=800&asciiBg=0c0d12&exportScale=3&seed=42&ang=0.8&amp=0.95
+```
+
+
+**Vivid halftone wallpaper (16:9):**
+
+```
+https://remiduvoux.github.io/gradient-generator/?colors=FF006E,8338EC,3A86FF&texture=dots&grain=5&contrast=0.75&features=4&warp=1.4&w=1280&h=720&seed=12345&ang=1.2&amp=1.0
+```
+
+**Smooth gradient, no texture (square):**
+
+```
+https://remiduvoux.github.io/gradient-generator/?colors=1a1a2e,16213e,0f3460,e94560&texture=none&contrast=0.3&features=2.5&warp=0.8&w=1000&h=1000&seed=999&ang=0&amp=0.85
+```
+
+**ASCII art background:**
+
+```
+https://remiduvoux.github.io/gradient-generator/?colors=00FF41,003B00,001a00&texture=ascii&grain=8&contrast=0.6&features=5&warp=1.8&w=1200&h=800&asciiBg=050505&seed=777&ang=2.5&amp=1.1
+```
+
+## Workflow tips for agents
+
+1. Build a URL with desired params and navigate to it (or open in a browser tool).
+2. Wait for the canvas to render (single synchronous draw on load).
+3. To export PNG: set `exportScale`, then click **Export PNG** in the sidebar (no URL trigger).
+4. To get a new random layout while keeping colors/texture: change only `seed` (and optionally `ang`, `amp`), or omit them for random values.
+5. Read the footer under the preview for a quick sanity check: `seed · WxH · texture`.
+
+## Source
+
+Repository: https://github.com/RemiDuvoux/gradient-generator
